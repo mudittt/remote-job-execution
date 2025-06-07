@@ -1,1 +1,6 @@
+.env
+*.rdb
+.DS_Store
 __practice/*
+*/__pycache__/
+.ipynb_checkpoints
