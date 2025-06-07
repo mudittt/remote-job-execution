@@ -215,7 +215,7 @@ async def simple_job_handler(job_data: Dict[str, Any]) -> Dict[str, Any]:
     await asyncio.sleep(2)
     
     return {
-        'processed_at': datetime.utcnow().isoformat(),
+        'processed_at': datetime.now().isoformat(),
         'input': job_data,
         'output': job_data.get('value', 0) * 2
     }

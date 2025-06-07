@@ -1,7 +1,7 @@
-# Remote Job Execution
+# REMOTE JOB EXECUTION
+Redis-backed job queue system with retry mechanisms, timeouts, and dead letter queues. 
 
-
-## Steps
+## SETUP
 
 1. Make sure you have git installed 🤡
 2. Clone.
@@ -41,3 +41,42 @@ pip install redis
 ```bash
 pip install -r requirements.txt
 ```
+
+
+## STEPS
+1. Open a Terminal, and <br/> Start the Listners/Workers.<br/> Leave this running in a terminal window. 
+```
+python main.py start
+```
+2. Add a job to the Queue.
+```
+python main.py add --data '{"to": "user@example.com", "subject": "Test Email"}' --options '{"timeout": 10, "max_attempts": 3, "retry_strategy": "exponential"}'
+```
+
+3. Show all jobs.
+```
+python main.py show
+```
+
+4. Re-queue a job by ID
+```
+python main.py process --id <id>
+```
+
+5. Stop the Listeners/Workers
+```
+python main.py stop
+```
+
+
+## SCREENSHOTS & SCREEN-RECORDINGS
+
+
+## TODO
+- Job Cancellation.
+- Better / Well formatted Logs. 
+- Using S3 for Logs and Process data.
+- Multiple Queues for Multiple Tasks <br/> 
+    > Tax Invoice Notification <br/>Pick-up & Drop-off Notifications <br/>Updates of a Parcel <br/>Promotional / Discount Mails
+- Priority Levels (right now, its just a FIFO based Queue)
+

@@ -404,3 +404,40 @@ class JobQueue:
         await self.redis.srem(f"jobs:{old_status.value}", job_id)
         await self.redis.sadd(f"jobs:{new_status.value}", job_id)
 
+    async def get_all_jobs(self) -> List[Dict[str, Any]]:
+        """
+        Fetch all jobs from all status sets and return as a list of job dicts.
+        """
+        job_ids = set()
+        # Collect job IDs from all status sets
+        for status in JobStatus:
+            ids = await self.redis.smembers(f"jobs:{status.value}")
+            job_ids.update(ids)
+        # Also include jobs in the dead letter queue (if not already included)
+        dlq_ids = await self.redis.lrange("dead_letter_queue", 0, -1)
+        job_ids.update(dlq_ids)
+        jobs = []
+        for job_id in job_ids:
+            job_data = await self.redis.hgetall(f"job:{job_id}")
+            if job_data:
+                jobs.append(self._format_job_data(job_data))
+        return jobs
+
+    async def save_job(self, job: Dict[str, Any]):
+        """
+        Save/overwrite a job dict to Redis hash.
+        """
+        # Convert fields to string for Redis
+        job_to_save = job.copy()
+        job_to_save['data'] = json.dumps(job_to_save.get('data', {}))
+        job_to_save['retry_history'] = json.dumps(job_to_save.get('retry_history', []))
+        if 'result' in job_to_save and job_to_save['result'] is not None:
+            job_to_save['result'] = json.dumps(job_to_save['result'])
+        else:
+            job_to_save['result'] = ''
+        # Remove non-primitive fields if any
+        for k, v in job_to_save.items():
+            if isinstance(v, (int, float)):
+                job_to_save[k] = str(v)
+        await self.redis.hset(f"job:{job['id']}", mapping=job_to_save)
+

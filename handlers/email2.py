@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+from datetime import datetime
 from utils.logger import setup_logger
 from typing import Dict, Any, Optional, Callable, List
 
@@ -14,15 +15,15 @@ async def unreliable_email_handler(job_data: Dict[str, Any]) -> Dict[str, Any]:
     await asyncio.sleep(processing_time)
     
     # Different failure scenarios
-    failure_chance = random.random()
-    failure_chance = 0.30
+    # failure_chance = random.random()
+    # failure_chance = 0.30
     
-    if failure_chance < 0.15:  
-        await asyncio.sleep(35)  # Will exceed typical timeout
-    elif failure_chance < 0.35:  
-        raise Exception("Temporary SMTP server error - retry recommended")
-    elif failure_chance < 0.45:  
-        raise Exception("Invalid email address - permanent failure")
+    # if failure_chance < 0.15:  
+    #     await asyncio.sleep(35)  # Will exceed typical timeout
+    # elif failure_chance < 0.35:  
+    #     raise Exception("Temporary SMTP server error - retry recommended")
+    # elif failure_chance < 0.45:  
+    #     raise Exception("Invalid email address - permanent failure")
     
     # Success case
     return {
