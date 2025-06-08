@@ -70,7 +70,7 @@ python main.py stop
 
 
 ## SCREENSHOTS & SCREEN-RECORDINGS
-
+https://github.com/user-attachments/assets/e5101e68-e688-4409-93f9-f28b3223f060
 
 ## TODO
 - Job Cancellation.
@@ -79,4 +79,6 @@ python main.py stop
 - Multiple Queues for Multiple Tasks <br/> 
     > Tax Invoice Notification <br/>Pick-up & Drop-off Notifications <br/>Updates of a Parcel <br/>Promotional / Discount Mails
 - Priority Levels (right now, its just a FIFO based Queue)
+- Multiple Workers
+- Testing
 
