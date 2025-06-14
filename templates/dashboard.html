@@ -36,12 +36,17 @@
                 <div class="stat-number" id="retry-jobs">-</div>
                 <div class="stat-label">Retry Queue</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-number" id="cancelled-jobs">-</div>
+                <div class="stat-label">Cancelled Jobs</div>
+            </div>
         </div>
         
         <div class="actions">
             <button class="btn btn-primary" onclick="toggleJobForm()">Add Job</button>
             <button class="btn" onclick="loadAllJobs()">View All Jobs</button>
             <button class="btn" onclick="loadDeadJobs()">Dead Letter Queue</button>
+            <button class="btn btn-primary" onclick="toggleCancelForm()"">Cancel Job</button>
             <button class="btn" onclick="refreshStats()">Refresh</button>
         </div>
         
@@ -70,6 +75,18 @@
                 </div>
                 <button type="submit" class="btn btn-primary">Create Job</button>
                 <button type="button" class="btn" onclick="toggleJobForm()">Cancel</button>
+            </form>
+        </div>
+        
+        <div class="cancel-form hidden" id="cancel-form">
+            <h3>Cancel Job</h3>
+            <form onsubmit="cancelJob(event)">
+                <div class="form-group">
+                    <label>Job Id:</label>
+                    <input type="text" id="job-id" required placeholder="ac36cee9-6a1e-4293-be72-7e551d7a2e3c">
+                </div>
+                <button type="submit" class="btn btn-primary">Confirm</button>
+                <button type="button" class="btn" onclick="toggleCancelForm()">Cancel</button>
             </form>
         </div>
         

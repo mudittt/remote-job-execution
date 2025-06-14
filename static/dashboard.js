@@ -30,11 +30,42 @@ function updateStats(data) {
     document.getElementById('completed-jobs').textContent = queueStats.status_counts?.completed || 0;
     document.getElementById('failed-jobs').textContent = queueStats.status_counts?.dead || 0;
     document.getElementById('retry-jobs').textContent = queueStats.retry_jobs || 0;
+    document.getElementById('cancelled-jobs').textContent = queueStats.status_counts?.cancelled || 0;
 }
 function toggleJobForm() {
     const form = document.getElementById('job-form');
     form.classList.toggle('hidden');
     document.getElementById('jobs-table').classList.add('hidden');
+}
+function toggleCancelForm() {
+    const form = document.getElementById('cancel-form');
+    form.classList.toggle('hidden');
+    document.getElementById('jobs-table').classList.add('hidden');
+}
+async function cancelJob(event) {
+    event.preventDefault();
+    const jobId = document.getElementById('job-id').value;
+
+    try {
+        const response = await fetch(`/api/jobs/${jobId}/cancel`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ reason: "Cancelled by user" })
+        });
+
+        if (response.ok) {
+            alert(`Job ${jobId} cancelled successfully.`);
+            document.getElementById('cancel-form').classList.add('hidden');
+            event.target.reset();
+        } else {
+            const errorData = await response.json();
+            alert(`Failed to cancel job: ${errorData.detail || response.statusText}`);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
 }
 async function createJob(event) {
     event.preventDefault();
@@ -96,7 +127,11 @@ function displayJobs(jobs, title) {
         const row = tbody.insertRow();
         row.innerHTML = `
             <td>${job.id}</td>
-            <td><span class="status-indicator status-${job.status === 'completed' ? 'running' : job.status === 'dead' ? 'failed' : 'pending'}"></span>${job.status}</td>
+            <td><span class="status-indicator status-${
+                job.status === 'completed' ? 'running' : 
+                job.status === 'dead' ? 'failed' : 
+                job.status === 'cancelled' ? 'failed' : 
+                'pending'}"></span>${job.status}</td>
             <td>${job.data?.to || '-'}</td>
             <td>${job.data?.subject || '-'}</td>
             <td>${job.attempts}/${job.max_attempts}</td>

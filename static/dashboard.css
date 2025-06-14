@@ -105,6 +105,7 @@ body {
 .status-running { background-color: #28a745; }
 .status-pending { background-color: #ffc107; }
 .status-failed { background-color: #dc3545; }
+.status-cancelled { background-color: #000000; }
 .jobs-table {
     border: 1px solid #ddd;
 }

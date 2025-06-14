@@ -7,6 +7,7 @@ class JobStatus(Enum):
     FAILED = "failed"
     RETRYING = "retrying"
     DEAD = "dead"
+    CANCELLED = "cancelled"
 
 
 class RetryStrategy(Enum):

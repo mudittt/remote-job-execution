@@ -161,6 +161,25 @@ async def create_job(request: CreateJobRequest):
         logger.error(f"Error creating job: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/jobs/{job_id}/cancel")
+async def cancel_job(job_id: str, reason: str = "Cancelled by user"):
+    """Cancel a job by ID"""
+    if not queue:
+        raise HTTPException(status_code=500, detail="Queue not initialized")
+    
+    try:
+        result = await queue.cancel_job(job_id, reason)
+        
+        if not result['success']:
+            raise HTTPException(status_code=400, detail=result['reason'])
+        
+        logger.info(f"🚫 Job {job_id} cancelled via API")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error cancelling job {job_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/jobs/{job_id}")
 async def get_job(job_id: str):
     """Get job details by ID"""

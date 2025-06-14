@@ -254,10 +254,10 @@ class JobQueue:
         return self._format_job_data(job_data, processing_start=current_time)
     
     def _format_job_data(
-        self, 
-        job_data: Dict[str, str], 
-        processing_start: Optional[datetime] = None
-    ) -> Dict[str, Any]:
+    self, 
+    job_data: Dict[str, str], 
+    processing_start: Optional[datetime] = None
+) -> Dict[str, Any]:
         return {
             'id': job_data['id'],
             'data': json.loads(job_data.get('data', '{}')),
@@ -272,6 +272,8 @@ class JobQueue:
             'failed_at': job_data.get('failed_at'),
             'retry_at': job_data.get('retry_at'),
             'moved_to_dlq_at': job_data.get('moved_to_dlq_at'),
+            'cancelled_at': job_data.get('cancelled_at'),  # Add this
+            'cancellation_reason': job_data.get('cancellation_reason'),  # Add this
             'attempts': int(job_data.get('attempts', 0)),
             'max_attempts': int(job_data.get('max_attempts', 3)),
             'timeout': int(job_data.get('timeout', 30)),
@@ -440,4 +442,127 @@ class JobQueue:
             if isinstance(v, (int, float)):
                 job_to_save[k] = str(v)
         await self.redis.hset(f"job:{job['id']}", mapping=job_to_save)
+
+    async def cancel_job(self, job_id: str, reason: str = "Cancelled by user") -> Dict[str, Any]:
+        job_data = await self.redis.hgetall(f"job:{job_id}")
+        
+        if not job_data:
+            return {
+                'success': False,
+                'reason': 'Job not found',
+                'job_id': job_id
+            }
+        
+        current_status = job_data.get('status')
+        current_time = datetime.utcnow()
+        
+        # Cannot cancel completed or already cancelled jobs
+        if current_status in [JobStatus.COMPLETED.value, JobStatus.CANCELLED.value]:
+            return {
+                'success': False,
+                'reason': f'Job is already {current_status}',
+                'job_id': job_id,
+                'current_status': current_status
+            }
+        
+        # Handle cancellation based on current status
+        cancellation_result = await self._handle_job_cancellation(job_data, reason, current_time)
+        
+        logger.info(f"🚫 Job {job_id} cancelled: {reason}")
+        return {
+            'success': True,
+            'job_id': job_id,
+            'previous_status': current_status,
+            'cancelled_at': current_time.isoformat(),
+            'reason': reason,
+            **cancellation_result
+        }
+
+    async def _handle_job_cancellation(
+        self, 
+        job_data: Dict[str, str], 
+        reason: str, 
+        current_time: datetime
+        ) -> Dict[str, Any]:
+        job_id = job_data['id']
+        queue_name = job_data['queue_name']
+        current_status = job_data.get('status')
+    
+        # Update job record with cancellation info
+        await self.redis.hset(f"job:{job_id}", mapping={
+            'status': JobStatus.CANCELLED.value,
+            'cancelled_at': current_time.isoformat(),
+            'updated_at': current_time.isoformat(),
+            'cancellation_reason': reason
+        })
+        
+        result = {'actions_taken': []}
+        
+        # Remove from appropriate queues/schedules based on current status
+        if current_status == JobStatus.PENDING.value:
+            # Remove from pending queue
+            removed = await self.redis.lrem(f"queue:{queue_name}", 0, job_id)
+            if removed > 0:
+                result['actions_taken'].append(f"Removed from pending queue '{queue_name}'")
+            
+        elif current_status == JobStatus.RETRYING.value:
+            # Remove from retry schedule
+            removed = await self.redis.zrem(f"retry:{queue_name}", job_id)
+            if removed > 0:
+                result['actions_taken'].append(f"Removed from retry schedule for queue '{queue_name}'")
+                
+        elif current_status == JobStatus.PROCESSING.value:
+            # For processing jobs, we can only mark as cancelled
+            # The worker should check for cancellation periodically
+            result['actions_taken'].append("Marked for cancellation (worker should check cancellation status)")
+            result['note'] = "Job is currently processing. Worker should check cancellation status and stop gracefully."
+            
+        elif current_status == JobStatus.DEAD.value:
+            # Remove from dead letter queue
+            removed = await self.redis.lrem("dead_letter_queue", 0, job_id)
+            if removed > 0:
+                result['actions_taken'].append("Removed from dead letter queue")
+        
+        # Update status tracking
+        old_status = JobStatus(current_status)
+        await self._update_job_status_index(job_id, old_status, JobStatus.CANCELLED)
+        result['actions_taken'].append("Updated status index")
+        
+        return result
+
+    async def is_job_cancelled(self, job_id: str) -> bool:
+        job_data = await self.redis.hgetall(f"job:{job_id}")
+        return job_data.get('status') == JobStatus.CANCELLED.value
+
+    async def get_cancelled_jobs(self, limit: int = 10) -> List[Dict[str, Any]]:
+
+        job_ids = await self.redis.smembers(f"jobs:{JobStatus.CANCELLED.value}")
+        jobs = []
+        
+        for job_id in list(job_ids)[:limit]:
+            job = await self.get_job(job_id)
+            if job:
+                jobs.append(job)
+        
+        return jobs
+
+    async def cleanup_cancelled_jobs(self, older_than_hours: int = 24) -> int:
+        cutoff_time = datetime.utcnow() - timedelta(hours=older_than_hours)
+        job_ids = await self.redis.smembers(f"jobs:{JobStatus.CANCELLED.value}")
+        
+        cleaned_count = 0
+        for job_id in job_ids:
+            job_data = await self.redis.hgetall(f"job:{job_id}")
+            if job_data and job_data.get('cancelled_at'):
+                cancelled_at = datetime.fromisoformat(job_data['cancelled_at'])
+                if cancelled_at < cutoff_time:
+                    # Remove job data and from status index
+                    await self.redis.delete(f"job:{job_id}")
+                    await self.redis.srem(f"jobs:{JobStatus.CANCELLED.value}", job_id)
+                    cleaned_count += 1
+                    
+        if cleaned_count > 0:
+            logger.info(f"🧹 Cleaned up {cleaned_count} cancelled jobs older than {older_than_hours} hours")
+        
+        return cleaned_count
 
