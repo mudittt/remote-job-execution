@@ -11,6 +11,7 @@ Usage:
 import asyncio
 import sys
 import signal
+from config.settings import get_redis_config
 import os
 from typing import Dict, Any
 from utils.logger import setup_logger
@@ -44,7 +45,8 @@ class StandaloneWorker:
         try:
             # Initialize the job queue
             logger.info(f"🔧 Initializing JobQueue for worker: {self.worker_name}")
-            self.queue = JobQueue()
+            redis_config = get_redis_config()
+            self.queue = JobQueue(redis_config.url)
             
             # Check if queue needs connection/initialization
             if hasattr(self.queue, 'connect'):

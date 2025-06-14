@@ -4,7 +4,6 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from contextlib import asynccontextmanager
 
-from fastapi.templating import Jinja2Templates
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
@@ -270,7 +269,6 @@ async def websocket_endpoint(websocket: WebSocket):
 # Mount static files and serve HTML
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-templates = Jinja2Templates(directory="templates")
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
     with open("templates/dashboard.html", "r") as f:
