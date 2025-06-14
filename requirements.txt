@@ -1,3 +1,9 @@
+fastapi
+uvicorn[standard]
+websockets
+python-multipart
 redis
 click 
 rich
+python-dotenv
+aiofiles

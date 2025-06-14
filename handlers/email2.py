@@ -12,8 +12,8 @@ async def unreliable_email_handler(job_data: Dict[str, Any]) -> Dict[str, Any]:
     # Variable processing time
     import random
     processing_time = random.uniform(1, 8)
-    await asyncio.sleep(processing_time)
-    
+    # await asyncio.sleep(processing_time)
+    await asyncio.sleep(10)
     # Different failure scenarios
     # failure_chance = random.random()
     # failure_chance = 0.30

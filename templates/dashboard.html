@@ -1,0 +1,406 @@
+ <!DOCTYPE html>
+<html>
+<head>
+    <title>Job Queue Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif;
+            margin: 0; 
+            padding: 20px; 
+            background: #f5f5f5;
+            color: #333;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white;
+            border: 1px solid #ddd;
+            padding: 20px;
+        }
+        .header {
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+        .header h1 { 
+            margin: 0 0 10px 0; 
+            font-size: 24px; 
+            font-weight: normal;
+        }
+        .status-line {
+            color: #666;
+            font-size: 14px;
+        }
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 15px; 
+            margin-bottom: 30px;
+        }
+        .stat-card { 
+            border: 1px solid #ddd;
+            padding: 15px; 
+            text-align: center;
+        }
+        .stat-number { 
+            font-size: 24px; 
+            font-weight: bold; 
+            margin-bottom: 5px;
+        }
+        .stat-label { 
+            color: #666; 
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .actions { 
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn { 
+            padding: 8px 16px; 
+            border: 1px solid #ddd; 
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn:hover { 
+            background: #f0f0f0;
+        }
+        .btn-primary { 
+            background: #333;
+            color: white;
+            border-color: #333;
+        }
+        .btn-primary:hover { 
+            background: #555;
+        }
+        .job-form {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .form-group { 
+            margin-bottom: 15px; 
+        }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group textarea { 
+            width: 100%; 
+            padding: 8px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .form-group input:focus, .form-group textarea:focus { 
+            outline: none;
+            border-color: #333;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-running { background-color: #28a745; }
+        .status-pending { background-color: #ffc107; }
+        .status-failed { background-color: #dc3545; }
+        .jobs-table {
+            border: 1px solid #ddd;
+        }
+        .jobs-table h3 {
+            margin: 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        .hidden { 
+            display: none; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Job Queue Dashboard</h1>
+            <div class="status-line">
+                <span class="status-indicator status-running"></span>
+                <span id="connection-status">Connected</span>
+            </div>
+        </div>
+        
+        <div class="stats-grid" id="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="pending-jobs">-</div>
+                <div class="stat-label">Pending Jobs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="processing-jobs">-</div>
+                <div class="stat-label">Processing</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="completed-jobs">-</div>
+                <div class="stat-label">Completed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="failed-jobs">-</div>
+                <div class="stat-label">Failed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="retry-jobs">-</div>
+                <div class="stat-label">Retry Queue</div>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <button class="btn btn-primary" onclick="toggleJobForm()">Add Job</button>
+            <button class="btn" onclick="loadAllJobs()">View All Jobs</button>
+            <button class="btn" onclick="loadDeadJobs()">Dead Letter Queue</button>
+            <button class="btn" onclick="refreshStats()">Refresh</button>
+        </div>
+        
+        <div class="job-form hidden" id="job-form">
+            <h3>Create New Job</h3>
+            <form onsubmit="createJob(event)">
+                <div class="form-group">
+                    <label>Email To:</label>
+                    <input type="email" id="job-email" required placeholder="user@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Subject:</label>
+                    <input type="text" id="job-subject" required placeholder="Email subject">
+                </div>
+                <div class="form-group">
+                    <label>Body:</label>
+                    <textarea id="job-body" rows="4" placeholder="Email body (optional)"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Max Attempts:</label>
+                    <input type="number" id="job-attempts" value="3" min="1" max="10">
+                </div>
+                <div class="form-group">
+                    <label>Timeout (seconds):</label>
+                    <input type="number" id="job-timeout" value="30" min="5" max="300">
+                </div>
+                <button type="submit" class="btn btn-primary">Create Job</button>
+                <button type="button" class="btn" onclick="toggleJobForm()">Cancel</button>
+            </form>
+        </div>
+        
+        <div class="jobs-table hidden" id="jobs-table">
+            <h3 id="jobs-title">All Jobs</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Job ID</th>
+                        <th>Status</th>
+                        <th>Email</th>
+                        <th>Subject</th>
+                        <th>Attempts</th>
+                        <th>Created At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="jobs-tbody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        let ws = null;
+        
+        // Initialize WebSocket connection
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+            
+            ws.onopen = function() {
+                document.getElementById('connection-status').textContent = 'Connected';
+                document.querySelector('.status-indicator').className = 'status-indicator status-running';
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.type === 'stats_update') {
+                    updateStats(data.data);
+                }
+            };
+            
+            ws.onclose = function() {
+                document.getElementById('connection-status').textContent = 'Disconnected';
+                document.querySelector('.status-indicator').className = 'status-indicator status-failed';
+                // Reconnect after 3 seconds
+                setTimeout(connectWebSocket, 3000);
+            };
+            
+            ws.onerror = function() {
+                document.getElementById('connection-status').textContent = 'Error';
+                document.querySelector('.status-indicator').className = 'status-indicator status-failed';
+            };
+        }
+        
+        // Update stats from WebSocket data
+        function updateStats(data) {
+            const queueStats = data.queue_stats;
+            // const workerStats = data.worker_stats;
+            
+            document.getElementById('pending-jobs').textContent = queueStats.pending_jobs || 0;
+            document.getElementById('processing-jobs').textContent = queueStats.status_counts?.processing || 0;
+            document.getElementById('completed-jobs').textContent = queueStats.status_counts?.completed || 0;
+            document.getElementById('failed-jobs').textContent = queueStats.status_counts?.dead || 0;
+            // document.getElementById('worker-processed').textContent = workerStats.processed_jobs || 0;
+            document.getElementById('retry-jobs').textContent = queueStats.retry_jobs || 0;
+        }
+        
+        // Toggle job creation form
+        function toggleJobForm() {
+            const form = document.getElementById('job-form');
+            form.classList.toggle('hidden');
+            document.getElementById('jobs-table').classList.add('hidden');
+        }
+        
+        // Create new job
+        async function createJob(event) {
+            event.preventDefault();
+            
+            const jobData = {
+                queue_name: 'email',
+                data: {
+                    to: document.getElementById('job-email').value,
+                    subject: document.getElementById('job-subject').value,
+                    body: document.getElementById('job-body').value
+                },
+                options: {
+                    max_attempts: parseInt(document.getElementById('job-attempts').value),
+                    timeout: parseInt(document.getElementById('job-timeout').value)
+                }
+            };
+            
+            try {
+                const response = await fetch('/api/jobs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(jobData)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`Job created successfully! ID: ${result.job_id}`);
+                    document.getElementById('job-form').classList.add('hidden');
+                    event.target.reset();
+                } else {
+                    alert('Error creating job');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // Load all jobs
+        async function loadAllJobs() {
+            try {
+                const response = await fetch('/api/jobs');
+                const data = await response.json();
+                displayJobs(data.jobs, 'All Jobs');
+            } catch (error) {
+                alert('Error loading jobs: ' + error.message);
+            }
+        }
+        
+        // Load dead letter jobs
+        async function loadDeadJobs() {
+            try {
+                const response = await fetch('/api/dead-letter-jobs');
+                const data = await response.json();
+                displayJobs(data.dead_letter_jobs, 'Dead Letter Queue');
+            } catch (error) {
+                alert('Error loading dead jobs: ' + error.message);
+            }
+        }
+        
+        // Display jobs in table
+        function displayJobs(jobs, title) {
+            document.getElementById('jobs-title').textContent = title;
+            document.getElementById('job-form').classList.add('hidden');
+            document.getElementById('jobs-table').classList.remove('hidden');
+            
+            const tbody = document.getElementById('jobs-tbody');
+            tbody.innerHTML = '';
+            
+            jobs.forEach(job => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${job.id.substring(0, 8)}...</td>
+                    <td><span class="status-indicator status-${job.status === 'completed' ? 'running' : job.status === 'dead' ? 'failed' : 'pending'}"></span>${job.status}</td>
+                    <td>${job.data?.to || '-'}</td>
+                    <td>${job.data?.subject || '-'}</td>
+                    <td>${job.attempts}/${job.max_attempts}</td>
+                    <td>${new Date(job.created_at).toLocaleString()}</td>
+                    <td>
+                        ${job.status === 'dead' ? 
+                            `<button class="btn btn-primary" onclick="requeueJob('${job.id}')">Requeue</button>` : 
+                            `<button class="btn" onclick="viewJob('${job.id}')">View</button>`
+                        }
+                    </td>
+                `;
+            });
+        }
+        
+        // Requeue dead job
+        async function requeueJob(jobId) {
+            try {
+                const response = await fetch(`/api/jobs/${jobId}/requeue`, { method: 'POST' });
+                if (response.ok) {
+                    alert('Job requeued successfully!');
+                    loadDeadJobs(); // Refresh the table
+                } else {
+                    alert('Error requeuing job');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // View job details
+        function viewJob(jobId) {
+            window.open(`/api/jobs/${jobId}`, '_blank');
+        }
+        
+        // Refresh stats manually
+        async function refreshStats() {
+            try {
+                const response = await fetch('/api/system/status');
+                const data = await response.json();
+                updateStats(data);
+            } catch (error) {
+                console.error('Error refreshing stats:', error);
+            }
+        }
+        
+        // Initialize
+        connectWebSocket();
+        refreshStats();
+    </script>
+</body>
+</html>  
