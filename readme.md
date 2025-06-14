@@ -44,28 +44,22 @@ pip install -r requirements.txt
 
 
 ## STEPS
-1. Open a Terminal, and <br/> Start the Listners/Workers.<br/> Leave this running in a terminal window. 
+1. Open a Terminal, and start the server
 ```
-python main.py start
+python run_server.py
 ```
-2. Add a job to the Queue.
+2. Go to [localhost:8000](http://127.0.0.1:8000/)
+3. Add a few Jobs in the queue. 
+4. Run the Workers
 ```
-python main.py add --data '{"to": "user@example.com", "subject": "Test Email"}' --options '{"timeout": 10, "max_attempts": 3, "retry_strategy": "exponential"}'
+python standaloneworker.py <worker_name> <queue_name>
 ```
-
-3. Show all jobs.
+Example:
 ```
-python main.py show
+python standaloneworker.py w1 email
 ```
-
-4. Re-queue a job by ID
 ```
-python main.py process --id <id>
-```
-
-5. Stop the Listeners/Workers
-```
-python main.py stop
+python standaloneworker.py w2 email
 ```
 
 
@@ -78,7 +72,7 @@ https://github.com/user-attachments/assets/e5101e68-e688-4409-93f9-f28b3223f060
 - Using S3 for Logs and Process data.
 - Multiple Queues for Multiple Tasks <br/> 
     > Tax Invoice Notification <br/>Pick-up & Drop-off Notifications <br/>Updates of a Parcel <br/>Promotional / Discount Mails
-- Priority Levels (right now, its just a FIFO based Queue)
-- Multiple Workers
+- Priority Level Queues
+- Multiple Workers <span style="color:green"><strong>[DONE]</strong></span>
 - Testing
 
